@@ -3,9 +3,9 @@ import json
 import os
 
 # Configuration from .env
-API_KEY = "3499dcca-f973-4398-b103-66377a356046"
-DATASET_ID = "gd_l1viktl72bvl7bjuj0"
-LINKEDIN_URL = "https://www.linkedin.com/in/williamhgates"
+API_KEY = "Your_Api_Key"
+DATASET_ID = "Your_Dataset_Id"
+LINKEDIN_URL = "Your_Linkedin_Url"
 
 def debug_brightdata():
     print(f"🚀 Debugging BrightData API for dataset {DATASET_ID}...")

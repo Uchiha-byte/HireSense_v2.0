@@ -2,8 +2,8 @@ import requests
 import json
 import time
 
-API_KEY = "3499dcca-f973-4398-b103-66377a356046"
-SNAPSHOT_ID = "sd_mldscf6m20owef1gs4" # The one we triggered earlier
+API_KEY = "Your_Api_Key"
+SNAPSHOT_ID = "Your_Snapshot_Id"
 
 def poll_snapshot():
     print(f"🚀 Polling BrightData Snapshot: {SNAPSHOT_ID}")
