@@ -1,0 +1,43 @@
+# Walkthrough — HireSense Integrations & Personalization
+
+I have successfully implemented the **LeetCode Integration**, alongside **Personalize** and **Activity** features. This includes full database persistence, automated activity logging, and a premium glassmorphic dashboard.
+
+## Changes Made
+
+### 1. LeetCode Integration
+- **API Fetching**: Built a robust fetcher for the unofficial Alfa LeetCode API, supporting both public and local Docker instances (port 3001).
+- **UI Components**: Created the [LeetCodeSection](file:///e:/HireSense/frontend/src/app/board/components/LeetCodeSection.tsx#11-172) component with visual metrics for coding proficiency, contest rankings, and badges.
+- **AI Analysis**: Updated the core analysis engine to incorporate LeetCode statistics into the candidate's technical evaluation.
+- **Manual Migration**: Fixed the "missing column" issue by forcing a schema cache refresh after adding `lc_status` and `lc_data`.
+
+### 2. Personalize & Activity Features
+- **Personalize Page**: Dashboard to manage interview presets, adjust scoring weights, and configure notifications.
+- **Activity Page**: Real-time feed of system events with unique iconography and deep links to candidate profiles.
+- **LinkedIn Logic**: Implemented a skip-fetch toggle (`NEXT_PUBLIC_LINKEDIN_SCRAPING_ENABLED=false`) to prevent credit usage while maintaining workflow.
+
+### 3. Database & Infrastructure
+- **Migration & Schema**: Automated schema updates via `/api/migrate` and verified through direct direct SQL execution for local development.
+- **Activity Logging**: Implemented a server-side `activityLogger` to capture events across the entire processing pipeline.
+
+## Verification Results
+
+### Automated Tests
+- [x] **Database Columns**: Verified `lc_status`, `lc_data`, and `leetcode_url` exist and are accessible.
+- [x] **Settings Persistence**: Custom weights and presets correctly persist across page reloads.
+- [x] **Activity logging**: Verified events are recorded during CV and LeetCode processing.
+
+### UI & UX Verification
+````carousel
+![LeetCode Section Verification](file:///C:/Users/anskh/.gemini/antigravity/brain/211243b8-7e5f-4e40-9f69-64860984ed0e/leetcode_integration_verify_1771955699790.webp)
+<!-- slide -->
+![Personalize Page Verification](file:///C:/Users/anskh/.gemini/antigravity/brain/211243b8-7e5f-4e40-9f69-64860984ed0e/reverify_migration_and_activity_1771954019452.webp)
+<!-- slide -->
+![Personalize Page Features](file:///C:/Users/anskh/.gemini/antigravity/brain/211243b8-7e5f-4e40-9f69-64860984ed0e/personalize_features.png)
+````
+
+> [!TIP]
+> To use the LeetCode API locally via Docker, run:
+> `docker run -p 3001:3000 alfaarghya/alfa-leetcode-api:2.0.3`
+
+> [!NOTE]
+> Database columns were verified and the schema was reloaded. If you still see "column not found" errors, a quick restart of your local Supabase stack will force a full cache refresh.

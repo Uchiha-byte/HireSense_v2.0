@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - canvas
+  - esbuild
+  - sharp
+  - supabase
+  - unrs-resolver
