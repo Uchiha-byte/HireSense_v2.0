@@ -1,5 +1,6 @@
 // app/api/reference-call/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 
 interface ReferenceRequestBody {
   phoneNumber: string;
@@ -10,6 +11,7 @@ interface ReferenceRequestBody {
   workDuration?: string;
   emailId?: string;
   meetingDate?: string;
+  addCodingInterview?: boolean;
 }
 
 // Helper function to validate email
@@ -136,12 +138,64 @@ export async function POST(request: NextRequest) {
     let emailSent = false;
     let emailError: string | undefined = undefined;
 
+    // Generate base meeting link (Google Meet-style)
+    const meetingLink = generateGoogleMeetLink(
+      body.referenceName,
+      body.candidateName
+    );
+
+    // Optional coding interview link (Judge0-based)
+    let codingInterviewUrl: string | undefined;
+
+    if (body.addCodingInterview) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const codingInterviewId = crypto.randomUUID();
+      codingInterviewUrl = `${appUrl.replace(/\/$/, '')}/coding-interview/${codingInterviewId}`;
+
+      // Background attempt to persist to DB
+      try {
+        const supabase = createServiceRoleClient();
+        const referenceId = `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        supabase.from('coding_interviews').insert({
+          id: codingInterviewId,
+          reference_id: referenceId,
+          candidate_name: body.candidateName,
+          reference_name: body.referenceName,
+          email: body.emailId || '',
+          meeting_date: body.meetingDate || '',
+          coding_interview_url: codingInterviewUrl,
+        }).then(({ error: dbError }) => {
+          if (dbError) {
+            console.warn('⚠️ Failed to persist coding interview record:', dbError);
+          } else {
+            console.log('✅ Coding interview record persisted');
+          }
+        });
+      } catch (err) {
+        console.warn('⚠️ Error while initiating coding interview persistence:', err);
+      }
+    }
+
     // Send email if both email and meeting date are provided
     if (body.emailId?.trim() && body.meetingDate?.trim()) {
       const formattedDate = formatMeetingDate(body.meetingDate);
-      const meetingLink = "127.0.0.1:8000";
 
       const emailSubject = 'Reference Verification Meeting Invitation';
+
+      const codingInterviewTextSection = codingInterviewUrl
+        ? `
+An optional coding interview has been enabled for this candidate.
+Coding Interview Link: ${codingInterviewUrl}
+`
+        : '';
+
+      const codingInterviewHtmlSection = codingInterviewUrl
+        ? `
+            <p><strong>Coding Interview:</strong> <a href="${codingInterviewUrl}" style="color: #0066cc; text-decoration: none; font-weight: bold;">Start coding interview session</a></p>
+          `
+        : '';
+
       const emailTextBody = `
 Hello ${body.referenceName},
 
@@ -153,6 +207,13 @@ Meeting Details:
 Date & Time: ${formattedDate}
 Platform: Google Meet
 Meeting Link: ${meetingLink}
+
+${codingInterviewUrl ? `
+Coding Interview (Judge0):
+An optional coding interview has been enabled for this candidate.
+Link: ${codingInterviewUrl}
+Note: Clicking this link will launch the Judge0 coding environment.
+` : ''}
 
 ${body.companyName ? `Company: ${body.companyName}` : ''}
 ${body.roleTitle ? `Role: ${body.roleTitle}` : ''}
@@ -176,11 +237,22 @@ Reference Verification Team
             <h3 style="margin-top: 0; color: #0066cc;">Meeting Details:</h3>
             <p><strong>Date & Time:</strong> ${formattedDate}</p>
             <p><strong>Platform:</strong> Google Meet</p>
-            <p><strong>Meeting Link:</strong> <a href="${meetingLink}" style="color: #0066cc; text-decoration: none; font-weight: bold;">${meetingLink}</a></p>
+            <p><strong>Meeting Link:</strong> <a href="${meetingLink}" style="color: #0066cc; text-decoration: none; font-weight: bold;">Join Google Meet</a></p>
             ${body.companyName ? `<p><strong>Company:</strong> ${body.companyName}</p>` : ''}
             ${body.roleTitle ? `<p><strong>Role:</strong> ${body.roleTitle}</p>` : ''}
             ${body.workDuration ? `<p><strong>Duration:</strong> ${body.workDuration}</p>` : ''}
           </div>
+
+          ${codingInterviewUrl ? `
+          <div style="background-color: #f9f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #9333ea;">
+            <h3 style="margin-top: 0; color: #9333ea;">Coding Interview (Judge0):</h3>
+            <p>An optional coding interview has been enabled for this candidate.</p>
+            <p style="margin-bottom: 0;">
+              <a href="${codingInterviewUrl}" style="display: inline-block; background-color: #9333ea; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">Launch Judge0 Coding Environment</a>
+            </p>
+            <p style="font-size: 11px; color: #6b7280; margin-top: 8px;">Technical support provided by Judge0 Execution Engine.</p>
+          </div>
+          ` : ''}
           
           <p>Thank you for your time and cooperation. We look forward to speaking with you.</p>
           
@@ -209,7 +281,9 @@ Reference Verification Team
       }
     }
 
-    const referenceId = `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const referenceId = `ref_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
 
     const response = {
       success: true,
@@ -224,6 +298,8 @@ Reference Verification Team
       meetingDate: body.meetingDate || '',
       emailSent: emailSent,
       emailError: emailError || undefined,
+      addCodingInterview: !!body.addCodingInterview,
+      codingInterviewUrl: codingInterviewUrl || '',
       message: emailSent
         ? 'Reference saved and meeting invite sent successfully!'
         : 'Reference saved successfully',
