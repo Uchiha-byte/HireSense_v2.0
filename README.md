@@ -505,6 +505,40 @@ docker build -t hiresense-backend ./backend
 docker run -p 8000:8000 hiresense-backend
 ```
 
+### Judge0 (Local Code Execution Engine)
+
+To enable optional live coding interviews, HireSense can integrate with a locally hosted [Judge0](https://github.com/judge0/judge0) instance.
+
+1. **Clone and start Judge0 via Docker** (see official docs for latest commands):
+   ```bash
+   git clone https://github.com/judge0/judge0.git
+   cd judge0
+   cp .env.example .env
+   docker compose -f docker-compose.yml up -d
+   ```
+
+   By default, Judge0 CE exposes an HTTP API on port `2358`:
+   - Base URL: `http://127.0.0.1:2358`
+
+2. **Configure HireSense to talk to Judge0**
+
+   In the root `.env` file:
+   ```bash
+   JUDGE0_API_URL=http://127.0.0.1:2358
+   BACKEND_API_URL=http://127.0.0.1:8000
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
+
+3. **How the integration works**
+
+   - Backend FastAPI exposes:
+     - `POST /judge0/execute` — proxies JSON payloads to `JUDGE0_API_URL/submissions?wait=true`.
+   - Next.js exposes:
+     - `POST /api/judge0` — frontend-friendly API that forwards requests to the FastAPI backend.
+   - Frontend:
+     - `/coding-interview/[id]` — a simple coding interview page that lets references run code snippets in Python, JavaScript, or C++ using Judge0.
+     - Reference invitation emails can optionally include a **coding interview link** pointing to this page, in addition to the normal meeting URL.
+
 ### Database
 
 **Production: Supabase Cloud**
