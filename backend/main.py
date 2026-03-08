@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
+import httpx
 
 from database import fetch_latest_applicant, save_interview_summary
 from interview import test_manager, llm_manager, audio_manager, RESPONSE_TIMEOUT
@@ -162,6 +163,44 @@ async def get_summary(test_id: str):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "active_tests": len(test_manager.tests)}
+
+
+@app.post("/judge0/execute")
+async def judge0_execute(request: Request):
+    """
+    Proxy endpoint to execute code via a locally running Judge0 instance.
+
+    Expects JSON body compatible with Judge0:
+    {
+      "language_id": int,
+      "source_code": "code",
+      "stdin": "optional input",
+      ...
+    }
+    """
+    judge0_url = os.getenv("JUDGE0_API_URL", "http://127.0.0.1:2358")
+    try:
+        payload = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON body: {e}")
+
+    submissions_url = f"{judge0_url.rstrip('/')}/submissions?wait=true"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(submissions_url, json=payload)
+        content_type = resp.headers.get("content-type", "")
+        data = resp.json() if "application/json" in content_type else {"raw": resp.text}
+        return JSONResponse(status_code=resp.status_code, content=data)
+    except httpx.RequestError as e:
+        logger.error(f"Error contacting Judge0 at {submissions_url}: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to reach Judge0 service. Ensure it is running and JUDGE0_API_URL is correct.",
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error while proxying Judge0 request: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal error while executing code.")
 
 if __name__ == "__main__":
     import uvicorn
