@@ -19,6 +19,9 @@ export interface Reference {
   callStatus?: "idle" | "calling" | "completed" | "failed";
   conversationId?: string;
   summary?: string;
+  addCodingInterview?: boolean;
+  codingInterviewUrl?: string;
+  meetingLink?: string;
 }
 
 export interface ReferenceFormData {
@@ -29,6 +32,7 @@ export interface ReferenceFormData {
   workDuration: string;
   emailId: string;
   meetingDate: string;
+  addCodingInterview: boolean;
 }
 
 interface ReferenceManagerProps {
@@ -62,6 +66,7 @@ export default function ReferenceManager({
     workDuration: "",
     emailId: "",
     meetingDate: "",
+    addCodingInterview: false,
   });
   const [openReferenceId, setOpenReferenceId] = useState<string | null>(null);
 
@@ -76,6 +81,7 @@ export default function ReferenceManager({
       workDuration: "",
       emailId: "",
       meetingDate: "",
+      addCodingInterview: false,
     });
   };
 
@@ -90,12 +96,13 @@ export default function ReferenceManager({
       workDuration: "",
       emailId: "",
       meetingDate: "",
+      addCodingInterview: false,
     });
   };
 
   const handleNewReferenceFormChange = (
     field: keyof ReferenceFormData,
-    value: string
+    value: string | boolean
   ) => {
     setNewReferenceForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -145,6 +152,7 @@ export default function ReferenceManager({
           workDuration: newReferenceForm.workDuration,
           emailId: newReferenceForm.emailId,
           meetingDate: newReferenceForm.meetingDate,
+          addCodingInterview: newReferenceForm.addCodingInterview,
           candidateName,
         }),
       });
@@ -167,6 +175,9 @@ export default function ReferenceManager({
         meetingDate: newReferenceForm.meetingDate,
         dateAdded: new Date().toLocaleDateString(),
         callStatus: "idle",
+        addCodingInterview: !!newReferenceForm.addCodingInterview,
+        codingInterviewUrl: data.codingInterviewUrl || "",
+        meetingLink: data.meetingLink || "",
       };
 
       onAddReference(reference);
@@ -179,6 +190,7 @@ export default function ReferenceManager({
         workDuration: "",
         emailId: "",
         meetingDate: "",
+        addCodingInterview: false,
       });
       setOpenReferenceId(reference.id);
       setNotification({
@@ -224,18 +236,16 @@ export default function ReferenceManager({
       <div className="p-6">
         {notification && (
           <div
-            className={`mb-4 p-4 rounded-md ${
-              notification.type === "success"
-                ? "bg-green-50 border border-green-200"
-                : "bg-red-50 border border-red-200"
-            }`}
+            className={`mb-4 p-4 rounded-md ${notification.type === "success"
+              ? "bg-green-50 border border-green-200"
+              : "bg-red-50 border border-red-200"
+              }`}
           >
             <p
-              className={`font-medium ${
-                notification.type === "success"
-                  ? "text-green-800"
-                  : "text-red-800"
-              }`}
+              className={`font-medium ${notification.type === "success"
+                ? "text-green-800"
+                : "text-red-800"
+                }`}
             >
               {notification.type === "success" ? "✅" : "❌"}{" "}
               {notification.message}

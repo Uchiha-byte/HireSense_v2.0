@@ -19,6 +19,7 @@ interface FormDataState {
   workDuration: string;
   emailId: string;
   meetingDate: string;
+  addCodingInterview: boolean;
 }
 
 export default function ReferenceCallForm({
@@ -34,6 +35,7 @@ export default function ReferenceCallForm({
     workDuration: "",
     emailId: "",
     meetingDate: "",
+    addCodingInterview: false,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -49,7 +51,7 @@ export default function ReferenceCallForm({
     return emailRegex.test(email);
   };
 
-  const handleInputChange = (field: keyof FormDataState, value: string) => {
+  const handleInputChange = (field: keyof FormDataState, value: string | boolean) => {
     console.log(`Updated ${field}:`, value);
     setFormData((prevState) => {
       const updatedData = {
@@ -150,6 +152,7 @@ export default function ReferenceCallForm({
         workDuration: formData.workDuration?.trim() || "",
         emailId,
         meetingDate,
+        addCodingInterview: formData.addCodingInterview,
       };
 
       console.log("📤 Sending payload:", payload);
@@ -197,6 +200,7 @@ export default function ReferenceCallForm({
           workDuration: "",
           emailId: "",
           meetingDate: "",
+          addCodingInterview: false,
         });
 
         // Clear success message after 5 seconds
@@ -373,6 +377,23 @@ export default function ReferenceCallForm({
           <p className="text-xs text-gray-500 mt-1">
             Optional - Required if email is provided
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            id="addCodingInterview-call"
+            type="checkbox"
+            className="h-4 w-4"
+            checked={formData.addCodingInterview}
+            onChange={(e) => handleInputChange("addCodingInterview", e.target.checked)}
+            disabled={isLoading}
+          />
+          <label
+            htmlFor="addCodingInterview-call"
+            className="text-sm text-gray-700"
+          >
+            Add coding interview link (Judge0) along with meeting invite
+          </label>
         </div>
 
         <Button type="submit" disabled={isLoading} className="w-full">

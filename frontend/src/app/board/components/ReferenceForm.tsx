@@ -6,7 +6,7 @@ import { ReferenceFormData } from "./ReferenceManager";
 
 interface ReferenceFormProps {
   formData: ReferenceFormData;
-  onFormChange: (field: keyof ReferenceFormData, value: string) => void;
+  onFormChange: (field: keyof ReferenceFormData, value: string | boolean) => void;
   onCancel: () => void;
   onConfirm: () => void;
   isLoading?: boolean;
@@ -87,6 +87,23 @@ export default function ReferenceForm({
           disabled={isLoading}
           required
         />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id="addCodingInterview"
+          type="checkbox"
+          className="h-4 w-4"
+          checked={formData.addCodingInterview}
+          onChange={(e) => onFormChange("addCodingInterview", e.target.checked)}
+          disabled={isLoading}
+        />
+        <label
+          htmlFor="addCodingInterview"
+          className="text-sm text-gray-700"
+        >
+          Add coding interview link (Judge0) along with meeting invite
+        </label>
       </div>
 
       <div className="flex gap-3 mt-2">

@@ -51,11 +51,38 @@ export default function ReferenceCard({
       {isOpen && (
         <div className="px-6 pb-6 pt-2">
           <div className="mb-2 text-sm text-gray-600">
-            {reference.companyName} 
-            {reference.roleTitle && ` | ${reference.roleTitle}`} 
+            {reference.companyName}
+            {reference.roleTitle && ` | ${reference.roleTitle}`}
             {reference.workDuration && ` | ${reference.workDuration}`}
           </div>
           <div className="mb-2 text-xs text-gray-400">Added: {reference.dateAdded}</div>
+          {reference.meetingLink && (
+            <div className="mb-3 flex items-center gap-2 text-xs">
+              <span className="text-gray-400">📅 Meeting:</span>
+              <a
+                href={reference.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 font-semibold hover:underline flex items-center gap-1"
+              >
+                Join Google Meet
+              </a>
+            </div>
+          )}
+
+          {reference.codingInterviewUrl && (
+            <div className="mb-3 flex items-center gap-2 text-xs">
+              <span className="text-gray-400">💻 Coding:</span>
+              <a
+                href={reference.codingInterviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-600 font-semibold hover:underline flex items-center gap-1"
+              >
+                Launch Judge0 Environment
+              </a>
+            </div>
+          )}
           <div className="flex gap-2 mb-2">
             <Button
               onClick={() => onCall(reference)}
