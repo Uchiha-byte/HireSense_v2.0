@@ -130,7 +130,7 @@ HireSense uses a modern full-stack architecture with event-driven processing:
          │                │               │              │
 ┌────────▼───────┐ ┌─────▼──────┐ ┌─────▼──────┐ ┌────▼─────┐ ┌────▼─────┐
 │ OpenAI GPT-4   │ │ Groq API   │ │ ElevenLabs │ │ Ashby    │ │ Judge0   │
-│ (Analysis)     │ │ (Whisper,  │ │ (Voice AI) │ │ (ATS)    │ │ (Code)    │
+│ (Analysis)     │ │ (Whisper,  │ │ (Voice AI) │ │ (ATS)    │ │ (Code)   │
 │                │ │  LLaMA)    │ │            │ │          │ │          │
 └────────────────┘ └────────────┘ └────────────┘ └──────────┘ └──────────┘
 ```
