@@ -83,8 +83,8 @@ HireSense is an AI-driven truth engine for hiring. In a world of curated resumes
 - **LinkedIn Scraping:** BrightData API (snapshot-based)
 - **GitHub:** GitHub REST API v3
 - **LeetCode:** Alfa LeetCode API (Public & Local Docker support)
+- **Code Execution:** Judge0 (Local Docker instance)
 - **Email:** Nodemailer with SMTP (Gmail/custom)
-- **Phone Calls:** Twilio (optional)
 - **Waitlist:** Airtable API
 - **Analytics:** Google Analytics (Next.js third-party integration)
 
@@ -129,8 +129,8 @@ HireSense uses a modern full-stack architecture with event-driven processing:
          ├────────────────┬───────────────┬──────────────┐
          │                │               │              │
 ┌────────▼───────┐ ┌─────▼──────┐ ┌─────▼──────┐ ┌────▼─────┐ ┌────▼─────┐
-│ OpenAI GPT-4   │ │ Groq API   │ │ ElevenLabs │ │ Ashby    │ │ LeetCode │
-│ (Analysis)     │ │ (Whisper,  │ │ (Voice AI) │ │ (ATS)    │ │ (API)    │
+│ OpenAI GPT-4   │ │ Groq API   │ │ ElevenLabs │ │ Ashby    │ │ Judge0   │
+│ (Analysis)     │ │ (Whisper,  │ │ (Voice AI) │ │ (ATS)    │ │ (Code)    │
 │                │ │  LLaMA)    │ │            │ │          │ │          │
 └────────────────┘ └────────────┘ └────────────┘ └──────────┘ └──────────┘
 ```
@@ -345,8 +345,6 @@ See [`env.example`](./env.example) for complete list. Key variables:
 - `BRIGHTDATA_API_KEY` - For LinkedIn scraping (do **not** wrap in quotes)
 - `LINKEDIN_SCRAPING_ENABLED` - Set to `true` to enable real scraping
 - `GITHUB_TOKEN` - For GitHub API (higher rate limits)
-- `TWILIO_ACCOUNT_SID` - For phone calls
-- `TWILIO_AUTH_TOKEN` - Twilio auth token
 - `AIRTABLE_API_KEY` - For waitlist management
 - `SMTP_*` - Email configuration
 
