@@ -47,7 +47,6 @@ You'll need accounts and API keys for the following services:
 ### Optional Services
 
 - **Ashby** (ATS integration)
-- **Twilio** (SMS/Phone calls)
 - **BrightData** (LinkedIn scraping)
 - **Airtable** (Waitlist management)
 

@@ -628,8 +628,8 @@ These webhooks are fire-and-forget and manage their own status updates.
 - **BrightData**: LinkedIn scraping
 - **GitHub API**: Profile and repository data
 - **Ashby API**: ATS integration
+- **Judge0**: Local code execution engine
 - **Airtable API**: Waitlist management
-- **Twilio**: Phone calls (optional)
 - **Supabase**: Database, storage, auth
 
 ---
