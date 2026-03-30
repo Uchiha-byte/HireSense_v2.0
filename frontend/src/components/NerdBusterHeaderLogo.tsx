@@ -133,6 +133,7 @@ export default function Navbar({
             <button
               onClick={handleDemoClick}
               className="text-sm/6 font-semibold text-zinc-900 hover:text-pink-400 transition-colors"
+              suppressHydrationWarning
             >
               Demo
             </button>
@@ -177,6 +178,7 @@ export default function Navbar({
                 <button
                   onClick={handleWaitlistClick}
                   className="flex px-3 py-1.5 gap-x-1 text-sm/6 font-semibold rounded-full text-white bg-black hover:bg-pink-500 hover:shadow-[0_0_20px_rgba(255,105,180,0.7)] transition-all duration-300"
+                  suppressHydrationWarning
                 >
                   Try HireSense
                   <ArrowIcon />
@@ -204,6 +206,7 @@ export default function Navbar({
                     setIsMenuOpen(false);
                   }}
                   className="text-base font-semibold text-zinc-900 hover:text-pink-500 transition-colors py-3 px-4  hover:bg-pink-50 text-left w-full"
+                  suppressHydrationWarning
                 >
                   Demo
                 </button>
@@ -255,6 +258,7 @@ export default function Navbar({
                         setIsMenuOpen(false);
                       }}
                       className="w-full flex items-center justify-center gap-x-1 px-6 py-3 text-base font-semibold  text-white bg-black hover:bg-pink-500 hover:shadow-[0_0_20px_rgba(255,105,180,0.7)] transition-all duration-300"
+                      suppressHydrationWarning
                     >
                       Try HireSense
                       <ArrowIcon />
