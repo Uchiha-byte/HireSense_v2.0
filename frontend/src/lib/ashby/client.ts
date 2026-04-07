@@ -50,17 +50,15 @@ export class AshbyClient {
         body: requestBody
       });
 
+      const responseText = await response.text();
       let data;
       try {
-        data = await response.json();
+        data = JSON.parse(responseText);
       } catch {
-        // Handle cases where Ashby returns HTML error pages instead of JSON
-        const text = await response.text();
-        
-        // Enhanced rate limit detection
-        const isRateLimit = text.toLowerCase().includes('too many') || 
-                           text.toLowerCase().includes('rate limit') ||
-                           text.toLowerCase().includes('throttle') ||
+        // Enhanced rate limit detection from text response
+        const isRateLimit = responseText.toLowerCase().includes('too many') || 
+                           responseText.toLowerCase().includes('rate limit') ||
+                           responseText.toLowerCase().includes('throttle') ||
                            response.status === 429;
         
         if (isRateLimit) {
@@ -82,11 +80,10 @@ export class AshbyClient {
           };
         }
         
-        // Handle other non-JSON responses
         return {
           success: false,
           error: { 
-            message: `Invalid JSON response from Ashby API: ${text.substring(0, 150)}...`,
+            message: `Invalid JSON response from Ashby API: ${responseText.substring(0, 150)}...`,
             code: 'INVALID_JSON_RESPONSE'
           }
         };

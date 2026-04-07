@@ -108,6 +108,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
+                suppressHydrationWarning
               />
             </div>
             <div>
@@ -119,6 +120,7 @@ export default function LoginPage() {
                 required
                 disabled={loading}
                 minLength={6}
+                suppressHydrationWarning
               />
             </div>
 
@@ -132,6 +134,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               className="w-full bg-black hover:bg-gray-800 text-white py-3 rounded-lg font-medium transition-colors"
+              suppressHydrationWarning
             >
               {loading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
             </Button>
@@ -144,6 +147,7 @@ export default function LoginPage() {
             <button
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-blue-600 hover:underline font-medium"
+              suppressHydrationWarning
             >
               {isSignUp ? "Sign in" : "Sign up"}
             </button>
