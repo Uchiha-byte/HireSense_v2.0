@@ -29,7 +29,7 @@ def test_api(username):
         print("-" * 50)
 
 if __name__ == "__main__":
-    test_user = "alfaarghya"
+    test_user = "r01k12"
     if len(sys.argv) > 1:
         test_user = sys.argv[1]
     test_api(test_user)
