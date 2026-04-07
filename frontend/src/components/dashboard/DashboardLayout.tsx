@@ -114,12 +114,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       if (item.name === "Search") {
         return (
           <span key={item.name}>
-            <button
-              onClick={handleSearchClick}
-              className={`${navLinkBase} ${navLinkInactive} ${sidebarCollapsed && !isMobile ? "justify-center px-0" : ""
-                }`}
-              title={sidebarCollapsed && !isMobile ? item.name : undefined}
-            >
+              <button
+                onClick={handleSearchClick}
+                className={`${navLinkBase} ${navLinkInactive} ${sidebarCollapsed && !isMobile ? "justify-center px-0" : ""
+                  }`}
+                title={sidebarCollapsed && !isMobile ? item.name : undefined}
+                suppressHydrationWarning
+              >
               <Icon className={`h-4 w-4 shrink-0 ${iconInactive}`} />
               {(!sidebarCollapsed || isMobile) && (
                 <span className="whitespace-nowrap">{item.name}</span>
@@ -140,6 +141,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               className={`${navLinkBase} ${active ? navLinkActive : navLinkInactive} ${sidebarCollapsed && !isMobile ? "justify-center px-0" : ""
                 }`}
               title={sidebarCollapsed && !isMobile ? item.name : undefined}
+              suppressHydrationWarning
             >
               <Icon className={`h-4 w-4 shrink-0 ${active ? iconActive : iconInactive}`} />
               {(!sidebarCollapsed || isMobile) && (
@@ -214,6 +216,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             onClick={signOut}
             className="flex-shrink-0 h-8 w-8 p-0 text-slate-400 hover:text-slate-700 hover:bg-white/60 rounded-lg transition-colors flex items-center justify-center"
             title="Sign out"
+            suppressHydrationWarning
           >
             <LogOut className="h-4 w-4" />
           </button>
@@ -343,6 +346,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   onClick={() => setSidebarCollapsed(true)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white/50 transition-colors"
                   title="Collapse sidebar"
+                  suppressHydrationWarning
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
