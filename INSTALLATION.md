@@ -296,7 +296,7 @@ python main.py
 
 A test user is automatically created with these credentials:
 - **Email**: team@HireSense.click
-- **Password**: lecommit42
+- **Password**: hiresense
 
 ---
 

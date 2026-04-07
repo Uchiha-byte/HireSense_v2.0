@@ -15,7 +15,10 @@ This document provides a comprehensive overview of all API endpoints in the Hire
   - [AI Analysis](#ai-analysis)
   - [Reference Management](#reference-management)
   - [Transcript Services](#transcript-services)
+  - [LeetCode Analysis](#leetcode-analysis)
   - [Waitlist Management](#waitlist-management)
+- [External Services](#external-services)
+  - [Judge0 (Code Execution)](#judge0-code-execution)
 
 ---
 
@@ -488,6 +491,46 @@ Retrieves saved call summary from database.
 
 ---
 
+---
+
+### LeetCode Analysis
+
+#### **POST /api/leetcode-fetch** - Fetch LeetCode Stats
+Analyzes LeetCode profile, solved problems, and contest ratings.
+
+**Request Body:**
+```json
+{
+  "applicant_id": "uuid",
+  "leetcode_url": "https://leetcode.com/username"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "applicant_id": "uuid",
+  "lc_data": {
+    "username": "johndoe",
+    "totalSolved": 450,
+    "ranking": 12000,
+    "contestData": {
+      "rating": 1850,
+      "topPercentage": 5.2
+    }
+  }
+}
+```
+
+**Features:**
+- Uses local `leetcode-api` (port 3001) or public fallback
+- Fetches solved counts by difficulty (Easy, Medium, Hard)
+- Includes recent contest participation and global ranking
+- Updates `lc_status` to 'processing' → 'ready'
+
+---
+
 ### Waitlist Management
 
 #### **POST /api/waitlist** - Join Waitlist
@@ -593,6 +636,34 @@ All frontend API routes use `withApiMiddleware` which provides:
 ```
 Authorization: Bearer {supabase_jwt_token}
 Content-Type: application/json
+```
+
+---
+
+## External Services
+
+### Judge0 (Code Execution)
+
+#### **POST /api/judge0** - Execute Code
+Proxies code execution requests to local Judge0 instance.
+
+**Request Body:**
+```json
+{
+  "source_code": "print('Hello')",
+  "language_id": 71,
+  "stdin": ""
+}
+```
+
+**Response:**
+```json
+{
+  "stdout": "Hello\n",
+  "time": "0.005",
+  "memory": 128,
+  "status": { "id": 3, "description": "Accepted" }
+}
 ```
 
 ---
