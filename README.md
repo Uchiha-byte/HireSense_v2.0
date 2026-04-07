@@ -137,12 +137,12 @@ HireSense uses a modern full-stack architecture with event-driven processing:
 
 ### Event-Driven & Resilient Processing Flow
 
-1. **Upload CV** → Client-side trigger → `/api/cv-process` → Extract data
-2. **Add LinkedIn URL** → Client-side trigger → `/api/linkedin-fetch` → Scrape profile
-3. **Add GitHub URL** → Client-side trigger → `/api/github-fetch` → Analyze repos
-4. **Add LeetCode URL** → Client-side trigger → `/api/leetcode-fetch` → Fetch stats
-5. **All Data Ready** → Context Sync + Polling Heartbeat → `/api/analysis` → Generate Score
-6. **Result Presentation** → HireSensing Profiles (Premium UI) → Dynamic Display
+1. **Upload CV** → Client-side trigger → `/api/cv-process` → Extract structured data
+2. **Add LinkedIn URL** → Client-side trigger → `/api/linkedin-fetch` → Scrape profile with BrightData
+3. **Add GitHub URL** → Client-side trigger → `/api/github-fetch` → Analyze repos and complexity
+4. **Add LeetCode URL** → Client-side trigger → `/api/leetcode-fetch` → Fetch stats and contest ratings
+5. **Data Ready** → Atomic state merge → `/api/analysis` → Generate Certainty Score
+6. **Result Presentation** → HireSensing Profiles → Dynamic Premium Display
 
 ### Reactivity & Robustness
 The system implements a dual-layer reactivity model to ensure results load automatically:
@@ -387,14 +387,21 @@ cv_file_id uuid            -- Foreign key to files
 cv_status processing_status
 li_status processing_status
 gh_status processing_status
+lc_status processing_status     -- LeetCode status
 ai_status processing_status
 
 -- JSON data
 cv_data jsonb
 li_data jsonb
 gh_data jsonb
+lc_data jsonb                   -- LeetCode fetched stats
 ai_data jsonb
 calls_summary text         -- Interview evaluation
+
+-- Metadata
+leetcode_url text               -- Candidate LeetCode profile
+github_url text
+linkedin_url text
 
 -- Generated columns
 status overall_status GENERATED  -- Computed from sub-statuses
