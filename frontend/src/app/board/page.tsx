@@ -20,7 +20,7 @@ import GitHubSection from "./components/GitHubSection";
 import CollapsibleCVSection from "./components/CollapsibleCVSection";
 import LinkedInProfileSection from "./components/LinkedInProfileSection";
 import LeetCodeSection from "./components/LeetCodeSection";
-import ReferenceManager, { Reference } from "./components/ReferenceManager";
+import ReferenceManager from "./components/ReferenceManager";
 
 function BoardPageContent() {
   const {
@@ -134,20 +134,16 @@ function BoardPageContent() {
     return () => clearInterval(interval);
   }, [urlId, selectedCandidate?.ai_status, selectedCandidate?.status, isNewForm, refreshApplicant]);
 
-  const [referencesByCandidate, setReferencesByCandidate] = useState<{
-    [id: string]: Reference[];
-  }>({});
-  const [callInProgress, setCallInProgress] = useState(false);
-  const [transcriptModal, setTranscriptModal] = useState({
-    isOpen: false,
-    conversationId: "",
-    referenceName: "",
-  });
-
   const [deleteConfirmModal, setDeleteConfirmModal] = useState({
     isOpen: false,
     applicantId: "",
     applicantName: "",
+  });
+
+  const [transcriptModal, setTranscriptModal] = useState({
+    isOpen: false,
+    conversationId: "",
+    referenceName: "",
   });
 
   const [summarySection, setSummarySection] = useState({
@@ -158,211 +154,6 @@ function BoardPageContent() {
   });
 
   const selectedCandidateId = selectedCandidate ? selectedCandidate.id : null;
-  const candidateReferences = selectedCandidateId
-    ? referencesByCandidate[selectedCandidateId] || []
-    : [];
-
-  // Handler for adding a new reference
-  const handleAddReference = (reference: Reference) => {
-    if (!selectedCandidateId) return;
-    setReferencesByCandidate((prev) => ({
-      ...prev,
-      [selectedCandidateId]: [reference, ...(prev[selectedCandidateId] || [])],
-    }));
-  };
-
-  const generateSummaryForReference = async (
-    referenceId: string,
-    conversationId: string
-  ) => {
-    if (!selectedCandidateId) return;
-
-    try {
-      // Fetch the transcript
-      const transcriptResponse = await fetch(
-        `/api/get-transcript?conversationId=${conversationId}`
-      );
-      const transcriptData = await transcriptResponse.json();
-
-      if (
-        transcriptData.success &&
-        transcriptData.hasTranscript &&
-        transcriptData.transcript
-      ) {
-        // Generate summary using the transcript
-        const summaryResponse = await fetch("/api/summarize-transcript", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: transcriptData.transcript }),
-        });
-
-        const summaryData = await summaryResponse.json();
-
-        if (summaryData.success && summaryData.summary) {
-          // Update the reference with the generated summary
-          setReferencesByCandidate((prev) => ({
-            ...prev,
-            [selectedCandidateId]: prev[selectedCandidateId].map((ref) =>
-              ref.id === referenceId
-                ? { ...ref, summary: summaryData.summary }
-                : ref
-            ),
-          }));
-          console.log(
-            "Summary generated for reference:",
-            referenceId,
-            summaryData.summary
-          );
-        }
-      } else {
-        // If transcript is not ready yet, try again in 15 seconds
-        setTimeout(
-          () => generateSummaryForReference(referenceId, conversationId),
-          15000
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Failed to generate summary for reference:",
-        referenceId,
-        error
-      );
-      // Retry once after 30 seconds on error
-      setTimeout(
-        () => generateSummaryForReference(referenceId, conversationId),
-        30000
-      );
-    }
-  };
-
-  const handleCallReference = async (reference: Reference) => {
-    if (callInProgress || !selectedCandidateId || !selectedCandidate) return;
-    setCallInProgress(true);
-    setReferencesByCandidate((prev) => ({
-      ...prev,
-      [selectedCandidateId]: prev[selectedCandidateId].map((ref) =>
-        ref.id === reference.id
-          ? { ...ref, callStatus: "calling" as const }
-          : ref
-      ),
-    }));
-    try {
-      const response = await fetch("/api/reference-call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phoneNumber: reference.phoneNumber,
-          candidateName: selectedCandidate.name,
-          referenceName: reference.name,
-          companyName: reference.companyName || "Previous Company",
-          roleTitle:
-            reference.roleTitle ||
-            selectedCandidate.cv_data?.jobTitle ||
-            selectedCandidate.li_data?.headline ||
-            "",
-          workDuration: reference.workDuration || "",
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setReferencesByCandidate((prev) => ({
-          ...prev,
-          [selectedCandidateId]: prev[selectedCandidateId].map((ref) =>
-            ref.id === reference.id
-              ? {
-                ...ref,
-                callStatus: "completed" as const,
-                conversationId: data.conversationId,
-              }
-              : ref
-          ),
-        }));
-        alert(
-          `Call initiated successfully! Conversation ID: ${data.conversationId}`
-        );
-
-        // Schedule automatic summary generation after a delay to allow transcript processing
-        setTimeout(async () => {
-          await generateSummaryForReference(reference.id, data.conversationId);
-        }, 10000); // Wait 10 seconds for transcript to be available
-      } else {
-        throw new Error(data.error || "Failed to initiate call");
-      }
-    } catch (error) {
-      setReferencesByCandidate((prev) => ({
-        ...prev,
-        [selectedCandidateId]: prev[selectedCandidateId].map((ref) =>
-          ref.id === reference.id
-            ? { ...ref, callStatus: "failed" as const }
-            : ref
-        ),
-      }));
-      alert(
-        `Failed to initiate call: ${error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setCallInProgress(false);
-    }
-  };
-
-  const handleViewTranscript = async (reference: Reference) => {
-    if (reference.conversationId) {
-      setTranscriptModal({
-        isOpen: true,
-        conversationId: reference.conversationId,
-        referenceName: reference.name,
-      });
-
-      // Auto-generate summary if it doesn't exist
-      if (!reference.summary && selectedCandidateId) {
-        try {
-          // First fetch the transcript
-          const transcriptResponse = await fetch(
-            `/api/get-transcript?conversationId=${reference.conversationId}`
-          );
-          const transcriptData = await transcriptResponse.json();
-
-          if (
-            transcriptData.success &&
-            transcriptData.hasTranscript &&
-            transcriptData.transcript
-          ) {
-            // Generate summary using the transcript
-            const summaryResponse = await fetch("/api/summarize-transcript", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ transcript: transcriptData.transcript }),
-            });
-
-            const summaryData = await summaryResponse.json();
-
-            if (summaryData.success && summaryData.summary) {
-              // Update the reference with the generated summary
-              setReferencesByCandidate((prev) => ({
-                ...prev,
-                [selectedCandidateId]: prev[selectedCandidateId].map((ref) =>
-                  ref.id === reference.id
-                    ? { ...ref, summary: summaryData.summary }
-                    : ref
-                ),
-              }));
-            }
-          }
-        } catch (error) {
-          console.error("Failed to generate summary:", error);
-        }
-      }
-    }
-  };
-
-  const closeTranscriptModal = () => {
-    setTranscriptModal({
-      isOpen: false,
-      conversationId: "",
-      referenceName: "",
-    });
-  };
 
   const handleShowCallSummary = async () => {
     if (!selectedCandidateId) return;
@@ -415,6 +206,14 @@ function BoardPageContent() {
       summary: "",
       loading: false,
       error: "",
+    });
+  };
+
+  const closeTranscriptModal = () => {
+    setTranscriptModal({
+      isOpen: false,
+      conversationId: "",
+      referenceName: "",
     });
   };
 
@@ -727,11 +526,8 @@ function BoardPageContent() {
 
                 {/* Reference Calls & Start Interview */}
                 <ReferenceManager
-                  references={candidateReferences}
-                  onAddReference={handleAddReference}
-                  onCallReference={handleCallReference}
-                  onViewTranscript={handleViewTranscript}
-                  callInProgress={callInProgress}
+                  applicantId={selectedCandidateId || undefined}
+                  candidateName={selectedCandidate.name}
                 />
 
                 {/* Call Summary Section */}
@@ -797,48 +593,40 @@ function BoardPageContent() {
         </main>
       </div>
 
-      {/* Transcript Modal */}
-      <TranscriptModal
-        isOpen={transcriptModal.isOpen}
-        onClose={closeTranscriptModal}
-        conversationId={transcriptModal.conversationId}
-        referenceName={transcriptModal.referenceName}
-      />
-
       {/* Delete Confirmation Modal */}
       {deleteConfirmModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/70 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/70 w-full max-w-md p-7">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-13 w-13 rounded-full bg-red-100/80 mb-4 p-3 w-fit">
-                <Trash2 className="h-6 w-6 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800 mb-2">
-                Delete Applicant
-              </h3>
-              <p className="text-sm text-slate-500 mb-6">
-                Are you sure you want to delete{" "}
-                <strong className="text-slate-700">{deleteConfirmModal.applicantName}</strong>? This action
-                cannot be undone.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <Button
-                  variant="outline"
-                  onClick={cancelDeleteApplicant}
-                  className="px-6 border-slate-200 text-slate-700 hover:bg-white/60 rounded-xl"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmDeleteApplicant}
-                  className="px-6 bg-red-500 hover:bg-red-600 text-white rounded-xl"
-                >
-                  Delete
-                </Button>
-              </div>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Delete Candidate?</h3>
+            <p className="text-slate-600 mb-6">Are you sure you want to delete <span className="font-semibold text-slate-800">{deleteConfirmModal.applicantName}</span>? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={cancelDeleteApplicant}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 rounded-xl bg-red-500 hover:bg-red-600"
+                onClick={confirmDeleteApplicant}
+              >
+                Delete
+              </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Transcript Modal */}
+      {transcriptModal.isOpen && (
+        <TranscriptModal
+          isOpen={transcriptModal.isOpen}
+          onClose={closeTranscriptModal}
+          conversationId={transcriptModal.conversationId}
+          referenceName={transcriptModal.referenceName}
+        />
       )}
     </>
   );
@@ -846,14 +634,7 @@ function BoardPageContent() {
 
 export default function BoardPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-violet-300 border-t-violet-600 animate-spin" />
-          <p className="text-sm text-slate-500">Loading…</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<div>Loading board...</div>}>
       <BoardPageContent />
     </Suspense>
   );
