@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form, Header
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
 import httpx
+from openai import AsyncOpenAI
+from supabase import create_client, Client
 
 from database import fetch_latest_applicant, save_interview_summary
 from interview import test_manager, llm_manager, audio_manager, RESPONSE_TIMEOUT
@@ -201,6 +203,100 @@ async def judge0_execute(request: Request):
     except Exception as e:
         logger.error(f"Unexpected error while proxying Judge0 request: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal error while executing code.")
+
+@app.post("/reference-upload")
+async def reference_upload(
+    reference_call_id: str = Form(...),
+    file: UploadFile = File(...),
+    x_watcher_secret: str = Header(None)
+):
+    try:
+        secret_key = os.getenv("WATCHER_SECRET", "your_watcher_secret_here")
+        if x_watcher_secret != secret_key:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        supabase_url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        
+        if not supabase_url or not supabase_key:
+            raise HTTPException(status_code=500, detail="Supabase not configured in backend")
+            
+        supabase: Client = create_client(supabase_url, supabase_key)
+        
+        # 1. Upload to Supabase Storage
+        file_content = await file.read()
+        storage_path = f"recordings/{reference_call_id}_{file.filename}"
+        
+        try:
+            res = supabase.storage.from_("reference-recordings").upload(
+                path=storage_path,
+                file=file_content,
+                file_options={"content-type": file.content_type}
+            )
+            # Update status to recording_uploaded
+            supabase.table("reference_calls").update({
+                "status": "recording_uploaded",
+                "storage_path": storage_path
+            }).eq("id", reference_call_id).execute()
+        except Exception as e:
+            logger.error(f"Storage upload failed: {e}")
+            # we can continue if it's already there or we just skip storage entirely if it fails
+        
+        # 2. Transcribe Audio
+        openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        temp_audio_path = os.path.join(AUDIO_DIR, f"temp_{reference_call_id}.m4a")
+        with open(temp_audio_path, "wb") as f:
+            f.write(file_content)
+        
+        try:
+            with open(temp_audio_path, "rb") as audio_file:
+                transcript_obj = await openai_client.audio.transcriptions.create(
+                    model="whisper-1", 
+                    file=audio_file
+                )
+            transcript_text = transcript_obj.text
+        except Exception as e:
+            logger.error(f"Whisper transcription failed: {e}")
+            transcript_text = "[Transcription Failed] " + str(e)
+            
+        # Cleanup temp file
+        if os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+            
+        # 3. Generate Summary
+        try:
+            summary_response = await openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are summarizing a reference check phone call/meeting. Provide a concise Q/A style summary of the conversation highlighting the candidate's strengths, weaknesses, and overall verification details. Do not output markdown, just plain text if possible."},
+                    {"role": "user", "content": f"Here is the transcript of the reference call:\n\n{transcript_text}"}
+                ]
+            )
+            summary_text = summary_response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"GPT summarization failed: {e}")
+            summary_text = "Summary generation failed."
+
+        # 4. Save to DB Update Status
+        supabase.table("reference_calls").update({
+            "transcript": {"text": transcript_text},
+            "summary": summary_text,
+            "status": "transcribed"
+        }).eq("id", reference_call_id).execute()
+        
+        return {"success": True, "message": "Processed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in reference-upload: {e}", exc_info=True)
+        # Mark as failed in DB if possible
+        try:
+            supabase.table("reference_calls").update({"status": "failed"}).eq("id", reference_call_id).execute()
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
