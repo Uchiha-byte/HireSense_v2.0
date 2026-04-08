@@ -1,10 +1,11 @@
 // ReferenceManager.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import ReferenceForm from "./ReferenceForm";
 import ReferenceCard from "./ReferenceCard";
+import { createClient } from "@/lib/supabase/client";
 
 export interface Reference {
   id: string;
@@ -16,12 +17,14 @@ export interface Reference {
   emailId: string;
   meetingDate: string;
   dateAdded: string;
-  callStatus?: "idle" | "calling" | "completed" | "failed";
+  callStatus?: "idle" | "scheduled" | "started" | "ended" | "recording_uploaded" | "transcribed" | "failed" | "calling" | "completed";
   conversationId?: string;
   summary?: string;
   addCodingInterview?: boolean;
   codingInterviewUrl?: string;
   meetingLink?: string;
+  durationMinutes?: number;
+  transcript?: any;
 }
 
 export interface ReferenceFormData {
@@ -32,32 +35,92 @@ export interface ReferenceFormData {
   workDuration: string;
   emailId: string;
   meetingDate: string;
+  durationMinutes: number;
   addCodingInterview: boolean;
 }
 
 interface ReferenceManagerProps {
-  references: Reference[];
+  // We keep candidateName for email generation if needed
   candidateName?: string;
-  onAddReference: (reference: Reference) => void;
-  onCallReference: (reference: Reference) => Promise<void>;
-  onViewTranscript: (reference: Reference) => void;
-  callInProgress: boolean;
+  applicantId?: string;
+  // Kept for backwards compatibility but we will primarily fetch internally
+  references?: Reference[]; 
+  onAddReference?: (reference: Reference) => void;
+  onCallReference?: (reference: Reference) => Promise<void>;
+  onViewTranscript?: (reference: Reference) => void;
+  callInProgress?: boolean;
 }
 
 export default function ReferenceManager({
-  references,
   candidateName = "Candidate",
-  onAddReference,
-  onCallReference,
-  onViewTranscript,
-  callInProgress,
+  applicantId
 }: ReferenceManagerProps) {
+  const [dbReferences, setDbReferences] = useState<Reference[]>([]);
+  const [isLoadingRefs, setIsLoadingRefs] = useState(false);
+
+  const supabase = createClient();
+
+  // Polling to keep reference call status updated
+  useEffect(() => {
+    if (!applicantId) return;
+
+    const fetchReferences = async () => {
+      try {
+        setIsLoadingRefs(true);
+        const { data, error } = await supabase
+          .from("reference_calls")
+          .select("*")
+          .eq("applicant_id", applicantId)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Error fetching reference calls:", error);
+          return;
+        }
+
+        if (data) {
+          const mappedRefs = data.map((row: any) => ({
+            id: row.id,
+            name: row.reference_name,
+            phoneNumber: row.phone_number,
+            companyName: row.company_name || "",
+            roleTitle: row.role_title || "",
+            workDuration: row.work_duration || "",
+            emailId: row.reference_email || "",
+            meetingDate: row.scheduled_time || "",
+            durationMinutes: row.duration_minutes || 15,
+            dateAdded: new Date(row.created_at).toLocaleDateString(),
+            callStatus: row.status as Reference["callStatus"],
+            conversationId: row.zoom_meeting_id,
+            addCodingInterview: !!row.coding_interview_url,
+            codingInterviewUrl: row.coding_interview_url || "",
+            meetingLink: row.zoom_join_url || "",
+            summary: row.summary,
+            transcript: row.transcript
+          }));
+          setDbReferences(mappedRefs);
+        }
+      } catch (e) {
+        console.error("Fetch DB References failed:", e);
+      } finally {
+        setIsLoadingRefs(false);
+      }
+    };
+
+    fetchReferences();
+
+    // Poll for updates if any call is not yet finalized
+    const interval = setInterval(fetchReferences, 5000);
+    return () => clearInterval(interval);
+  }, [applicantId, supabase]);
+
   const [addingReference, setAddingReference] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+  
   const [newReferenceForm, setNewReferenceForm] = useState<ReferenceFormData>({
     name: "",
     phoneNumber: "",
@@ -66,8 +129,10 @@ export default function ReferenceManager({
     workDuration: "",
     emailId: "",
     meetingDate: "",
+    durationMinutes: 15,
     addCodingInterview: false,
   });
+  
   const [openReferenceId, setOpenReferenceId] = useState<string | null>(null);
 
   const handleStartAddReference = () => {
@@ -81,6 +146,7 @@ export default function ReferenceManager({
       workDuration: "",
       emailId: "",
       meetingDate: "",
+      durationMinutes: 15,
       addCodingInterview: false,
     });
   };
@@ -88,21 +154,11 @@ export default function ReferenceManager({
   const handleCancelAddReference = () => {
     setAddingReference(false);
     setNotification(null);
-    setNewReferenceForm({
-      name: "",
-      phoneNumber: "",
-      companyName: "",
-      roleTitle: "",
-      workDuration: "",
-      emailId: "",
-      meetingDate: "",
-      addCodingInterview: false,
-    });
   };
 
   const handleNewReferenceFormChange = (
     field: keyof ReferenceFormData,
-    value: string | boolean
+    value: string | boolean | number
   ) => {
     setNewReferenceForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -113,7 +169,11 @@ export default function ReferenceManager({
   };
 
   const handleConfirmAddReference = async () => {
-    // Validate all required fields
+    if (!applicantId) {
+      setNotification({ type: "error", message: "Missing applicant ID" });
+      return;
+    }
+
     if (!newReferenceForm.name.trim()) {
       setNotification({ type: "error", message: "Reference Name is required" });
       return;
@@ -138,13 +198,13 @@ export default function ReferenceManager({
     setIsLoading(true);
 
     try {
-      // Send data to API to save reference and send email
       const response = await fetch("/api/reference-call", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          applicantId: applicantId,
           referenceName: newReferenceForm.name,
           phoneNumber: newReferenceForm.phoneNumber,
           companyName: newReferenceForm.companyName,
@@ -152,6 +212,7 @@ export default function ReferenceManager({
           workDuration: newReferenceForm.workDuration,
           emailId: newReferenceForm.emailId,
           meetingDate: newReferenceForm.meetingDate,
+          durationMinutes: newReferenceForm.durationMinutes,
           addCodingInterview: newReferenceForm.addCodingInterview,
           candidateName,
         }),
@@ -163,24 +224,6 @@ export default function ReferenceManager({
         throw new Error(data.error || "Failed to save reference");
       }
 
-      // Create reference object
-      const reference: Reference = {
-        id: data.id || Date.now().toString(),
-        name: newReferenceForm.name.trim(),
-        phoneNumber: newReferenceForm.phoneNumber.trim(),
-        companyName: newReferenceForm.companyName.trim(),
-        roleTitle: newReferenceForm.roleTitle.trim(),
-        workDuration: newReferenceForm.workDuration.trim(),
-        emailId: newReferenceForm.emailId.trim(),
-        meetingDate: newReferenceForm.meetingDate,
-        dateAdded: new Date().toLocaleDateString(),
-        callStatus: "idle",
-        addCodingInterview: !!newReferenceForm.addCodingInterview,
-        codingInterviewUrl: data.codingInterviewUrl || "",
-        meetingLink: data.meetingLink || "",
-      };
-
-      onAddReference(reference);
       setAddingReference(false);
       setNewReferenceForm({
         name: "",
@@ -190,16 +233,35 @@ export default function ReferenceManager({
         workDuration: "",
         emailId: "",
         meetingDate: "",
+        durationMinutes: 15,
         addCodingInterview: false,
       });
-      setOpenReferenceId(reference.id);
+      setOpenReferenceId(data.id);
       setNotification({
         type: "success",
-        message: "Reference saved and meeting invite sent successfully!",
+        message: "Reference saved and Zoom meeting invite sent successfully!",
       });
 
-      // Clear notification after 5 seconds
       setTimeout(() => setNotification(null), 5000);
+      
+      // Update local state proactively
+      setDbReferences([{
+        id: data.id || Date.now().toString(),
+        name: newReferenceForm.name.trim(),
+        phoneNumber: newReferenceForm.phoneNumber.trim(),
+        companyName: newReferenceForm.companyName.trim(),
+        roleTitle: newReferenceForm.roleTitle.trim(),
+        workDuration: newReferenceForm.workDuration.trim(),
+        emailId: newReferenceForm.emailId.trim(),
+        meetingDate: newReferenceForm.meetingDate,
+        durationMinutes: newReferenceForm.durationMinutes,
+        dateAdded: new Date().toLocaleDateString(),
+        callStatus: "scheduled",
+        addCodingInterview: !!newReferenceForm.addCodingInterview,
+        codingInterviewUrl: data.codingInterviewUrl || "",
+        meetingLink: data.meetingLink || "",
+      }, ...dbReferences]);
+
     } catch (error) {
       setNotification({
         type: "error",
@@ -210,6 +272,10 @@ export default function ReferenceManager({
       setIsLoading(false);
     }
   };
+
+  // We are removing onViewTranscript and local call since this is now integrated natively into DB updates via watcher
+  const handleCallReference = async () => {};
+  const handleViewTranscript = async () => {};
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
@@ -264,7 +330,7 @@ export default function ReferenceManager({
             />
           )}
 
-          {references.map((reference) => (
+          {dbReferences.map((reference) => (
             <ReferenceCard
               key={reference.id}
               reference={reference}
@@ -274,13 +340,13 @@ export default function ReferenceManager({
                   openReferenceId === reference.id ? null : reference.id
                 )
               }
-              onCall={onCallReference}
-              onViewTranscript={onViewTranscript}
-              callInProgress={callInProgress}
+              onCall={handleCallReference} // Just stubs now since it's driven DB status
+              onViewTranscript={handleViewTranscript} 
+              callInProgress={false}
             />
           ))}
 
-          {references.length === 0 && (
+          {dbReferences.length === 0 && !isLoadingRefs && !addingReference && (
             <div className="text-gray-400 text-center py-6">
               No references added yet.
             </div>

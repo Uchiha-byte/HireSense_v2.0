@@ -6,7 +6,7 @@ import { ReferenceFormData } from "./ReferenceManager";
 
 interface ReferenceFormProps {
   formData: ReferenceFormData;
-  onFormChange: (field: keyof ReferenceFormData, value: string | boolean) => void;
+  onFormChange: (field: keyof ReferenceFormData, value: string | boolean | number) => void;
   onCancel: () => void;
   onConfirm: () => void;
   isLoading?: boolean;
@@ -23,7 +23,8 @@ export default function ReferenceForm({
     formData.name.trim() &&
     formData.phoneNumber.trim() &&
     formData.emailId.trim() &&
-    formData.meetingDate.trim();
+    formData.meetingDate.trim() &&
+    formData.durationMinutes > 0;
 
   return (
     <div className="border border-gray-200 rounded-xl bg-slate-50 p-6 flex flex-col gap-4">
@@ -70,23 +71,42 @@ export default function ReferenceForm({
       />
 
       <div className="flex flex-col md:flex-row md:items-center gap-4">
-        <input
-          type="email"
-          className="border rounded-md px-3 py-2 text-gray-800 w-full md:w-1/2"
-          placeholder="Email ID*"
-          value={formData.emailId}
-          onChange={(e) => onFormChange("emailId", e.target.value)}
-          disabled={isLoading}
-          required
-        />
-        <input
-          type="datetime-local"
-          className="border rounded-md px-3 py-2 text-gray-800 w-full md:w-1/2"
-          value={formData.meetingDate}
-          onChange={(e) => onFormChange("meetingDate", e.target.value)}
-          disabled={isLoading}
-          required
-        />
+        <div className="w-full md:w-1/3 flex flex-col gap-1">
+            <label className="text-xs text-gray-500 font-medium" style={{ opacity: 0 }}>Email</label>
+          <input
+            type="email"
+            className="border rounded-md px-3 py-2 text-gray-800 w-full"
+            placeholder="Email ID*"
+            value={formData.emailId}
+            onChange={(e) => onFormChange("emailId", e.target.value)}
+            disabled={isLoading}
+            required
+            />
+        </div>
+        <div className="w-full md:w-1/3 flex flex-col gap-1">
+          <label className="text-xs text-gray-500 font-medium">Meeting Date & Time</label>
+          <input
+            type="datetime-local"
+            className="border rounded-md px-3 py-2 text-gray-800 w-full"
+            value={formData.meetingDate}
+            onChange={(e) => onFormChange("meetingDate", e.target.value)}
+            disabled={isLoading}
+            required
+          />
+        </div>
+        <div className="w-full md:w-1/3 flex flex-col gap-1">
+          <label className="text-xs text-gray-500 font-medium">Duration (Minutes)</label>
+          <input
+            type="number"
+            min="5"
+            step="5"
+            className="border rounded-md px-3 py-2 text-gray-800 w-full"
+            value={formData.durationMinutes || 15}
+            onChange={(e) => onFormChange("durationMinutes", parseInt(e.target.value) || 15)}
+            disabled={isLoading}
+            required
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -121,7 +141,7 @@ export default function ReferenceForm({
           size="sm"
           className="bg-emerald-500 hover:bg-emerald-600 text-white"
         >
-          {isLoading ? "Saving..." : "Confirm"}
+          {isLoading ? "Saving..." : "Schedule Zoom Meet"}
         </Button>
       </div>
     </div>
