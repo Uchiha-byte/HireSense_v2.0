@@ -20,6 +20,7 @@ HireSense is an AI-driven truth engine for hiring. In a world of curated resumes
 - **Problem-Solving Analysis**: Integrates LeetCode statistics to verify technical consistency
 - **Flags inconsistencies** in claims or achievements
 - **Builds a single verified narrative** from fragmented data
+- **Automated Reference Calls**: Natural Zoom-based interviews with automated recording, transcription, and AI summarization.
 
 ### 🎙️ Empathetic AI Interviews
 **Conversations that reveal character, not keywords.**
@@ -65,9 +66,10 @@ HireSense is an AI-driven truth engine for hiring. In a world of curated resumes
 ### AI & Machine Learning
 - **LLM Provider:** Groq API (Llama models for fast inference)
 - **Analysis:** OpenAI GPT-4 & GPT-4 Vision
-- **Speech-to-Text:** Groq Whisper API
+- **Speech-to-Text:** OpenAI Whisper v3 (via local Python pipeline)
 - **Text-to-Speech:** ElevenLabs Conversational AI
 - **Voice Synthesis:** Edge TTS (Microsoft)
+- **Meeting Platform:** Zoom API (Server-to-Server OAuth) for automated scheduling and status tracking.
 
 ### Database & Infrastructure
 - **Primary Database:** Supabase (PostgreSQL 15)
@@ -128,11 +130,11 @@ HireSense uses a modern full-stack architecture with event-driven processing:
          │
          ├────────────────┬───────────────┬──────────────┐
          │                │               │              │
-┌────────▼───────┐ ┌─────▼──────┐ ┌─────▼──────┐ ┌────▼─────┐ ┌────▼─────┐
-│ OpenAI GPT-4   │ │ Groq API   │ │ ElevenLabs │ │ Ashby    │ │ Judge0   │
-│ (Analysis)     │ │ (Whisper,  │ │ (Voice AI) │ │ (ATS)    │ │ (Code)   │
-│                │ │  LLaMA)    │ │            │ │          │ │          │
-└────────────────┘ └────────────┘ └────────────┘ └──────────┘ └──────────┘
+┌────────▼───────┐ ┌─────▼──────┐ ┌─────▼──────┐ ┌────▼─────┐ ┌────▼─────┐ ┌────▼─────┐
+│ OpenAI GPT-4   │ │ Groq API   │ │ ElevenLabs │ │ Ashby    │ │ Judge0   │ │ Zoom API │
+│ (Analysis)     │ │ (Whisper,  │ │ (Voice AI) │ │ (ATS)    │ │ (Code)   │ │ (Meet)   │
+│                │ │  LLaMA)    │ │            │ │          │ │          │ │          │
+└────────────────┘ └────────────┘ └────────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
 ### Event-Driven & Resilient Processing Flow
@@ -142,7 +144,9 @@ HireSense uses a modern full-stack architecture with event-driven processing:
 3. **Add GitHub URL** → Client-side trigger → `/api/github-fetch` → Analyze repos and complexity
 4. **Add LeetCode URL** → Client-side trigger → `/api/leetcode-fetch` → Fetch stats and contest ratings
 5. **Data Ready** → Atomic state merge → `/api/analysis` → Generate Certainty Score
-6. **Result Presentation** → HireSensing Profiles → Dynamic Premium Display
+6. **Reference Verification** → `/api/reference-call` → Auto-schedule Zoom → Email invite
+7. **Recording Pipeline** → Zoom Meeting ends → Local recording saved → `watcher.py` detects file → Auto-upload to backend
+8. **AI Summarization** → Backend triggers Whisper transcription → GPT-4o generates call summary → Dashboard updates in real-time
 
 ### Reactivity & Robustness
 The system implements a dual-layer reactivity model to ensure results load automatically:
@@ -168,7 +172,9 @@ HireSense/
 │   ├── fetcher.py             # Utility to fetch applicants
 │   ├── requirements.txt       # Python dependencies
 │   ├── static/                # Static files (index.html)
-│   └── audio/                 # Generated TTS audio files
+│   ├── audio/                 # Generated TTS audio files
+│   ├── watcher.py             # Folder watcher for Zoom recordings
+│   └── recordings/            # (Local) Zoom recording storage source
 │
 ├── frontend/                   # Next.js Frontend
 │   ├── src/
@@ -180,7 +186,8 @@ HireSense/
 │   │   │   │   ├── github-fetch/ # GitHub scraping
 │   │   │   │   ├── linkedin-fetch/ # LinkedIn scraping (BrightData)
 │   │   │   │   ├── leetcode-fetch/ # LeetCode stats fetching
-│   │   │   │   ├── reference-call/ # Reference calls
+│   │   │   │   ├── reference-call/ # Zoom scheduling & Email
+│   │   │   │   ├── zoom-webhook/  # Zoom meeting status updates
 │   │   │   │   ├── get-transcript/ # ElevenLabs transcripts
 │   │   │   │   ├── summarize-transcript/ # Call summaries
 │   │   │   │   ├── test-webhook/ # Webhook testing
@@ -316,6 +323,20 @@ HireSense/
    ```
    Backend: http://localhost:8000
 
+10. **Start the Zoom Recording Watcher** (Required for Reference Calls)
+    In a new terminal:
+    ```bash
+    cd backend
+    python watcher.py
+    ```
+    Ensure your Zoom local recording path is set correctly in `watcher.py` (Default: `E:\HireSense\Call Recordings`).
+
+11. **Configure Zoom Webhooks**
+    - Use [Ngrok](https://ngrok.com/) to expose your local frontend: `ngrok http 3000`
+    - In Zoom App Marketplace → Feature → Event Subscriptions:
+    - Event Notification Endpoint: `https://your-ngrok-url.ngrok-free.app/api/zoom-webhook`
+    - Subscribe to: `Meeting -> Start Meeting` and `Meeting -> End Meeting`.
+
 ### Docker Setup (Alternative)
 
 ```bash
@@ -424,6 +445,20 @@ mime_type text
 created_at timestamptz
 updated_at timestamptz
 ```
+
+#### `reference_calls`
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PRIMARY KEY | Unique call ID |
+| applicant_id | uuid | Links to applicant |
+| status | text | scheduled, started, ended, recording_uploaded, transcribed |
+| zoom_join_url | text | Meeting link |
+| zoom_meeting_id | text | Meeting ID |
+| duration_minutes | int | Scheduled duration |
+| recording_url | text | Supabase storage URL |
+| transcript | jsonb | Full Whisper transcript |
+| ai_summary | text | GPT-4o summary |
+| created_at | timestamptz | Timestamp |
 
 #### `ashby_candidates`
 ```sql
