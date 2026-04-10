@@ -43,6 +43,7 @@ You'll need accounts and API keys for the following services:
 - **Groq** - [Get API key here](https://console.groq.com/keys)
 - **ElevenLabs** - [Get API key here](https://elevenlabs.io/app/settings/api-keys)
 - **GitHub** - [Generate token here](https://github.com/settings/tokens)
+- **Zoom** - [Create S2S OAuth App](https://marketplace.zoom.us/) (Required for Reference Calls)
 
 ### Optional Services
 
@@ -285,6 +286,12 @@ cd backend
 python main.py
 ```
 
+4. **Start the Reference Call Watcher** (Required for automation):
+```bash
+cd backend
+python watcher.py
+```
+
 ### Access Points
 
 - **Frontend**: http://localhost:3000
@@ -344,6 +351,12 @@ Error: Module not found
 cd backend
 pip install -r requirements.txt
 ```
+
+#### 6. Zoom Recording Not Uploading
+**Solution**: 
+- Ensure `watcher.py` is running in a terminal.
+- Verify `E:\HireSense\Call Recordings` path exists.
+- Check `WATCHER_SECRET` matches in both `.env` files.
 
 ### Logs and Debugging
 
