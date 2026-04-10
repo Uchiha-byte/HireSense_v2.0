@@ -145,6 +145,26 @@ Returns health status and active session count.
 
 ---
 
+#### **POST /reference-upload** - Upload & Process Reference Recording
+Receives Zoom recordings from `watcher.py`, uploads to Supabase, transcribes via Whisper, and summarizes via GPT-4o.
+
+**Request:** 
+- `multipart/form-data`: `file`, `reference_call_id`.
+- Requires `Authorization: Bearer <WATCHER_SECRET>`
+
+**Response:**
+```json
+{
+  "success": true,
+  "storage_path": "recordings/...",
+  "transcript": "...",
+  "summary": "..."
+}
+```
+
+
+---
+
 ## Frontend API (Next.js)
 
 **Base URL:** `http://localhost:3000/api` (Development)  
@@ -395,8 +415,8 @@ Performs comprehensive AI analysis on applicant data.
 
 ### Reference Management
 
-#### **POST /api/reference-call** - Schedule Reference Call
-Initiates reference verification call via ElevenLabs or sends meeting invite.
+#### **POST /api/reference-call** - Schedule Reference Call (Zoom)
+Creates a Zoom meeting and sends an automated invitation email.
 
 **Request Body:**
 ```json
@@ -406,9 +426,11 @@ Initiates reference verification call via ElevenLabs or sends meeting invite.
   "referenceName": "Jane Smith",
   "companyName": "Acme Corp",
   "roleTitle": "Senior Engineer",
-  "workDuration": "2020-2023",
+  "workDuration": "3 Years",
   "emailId": "jane@example.com",
-  "meetingDate": "2024-01-15T10:00:00Z"
+  "meetingDate": "2024-01-15T10:00:00Z",
+  "durationMinutes": 15,
+  "addCodingInterview": true
 }
 ```
 
@@ -418,15 +440,31 @@ Initiates reference verification call via ElevenLabs or sends meeting invite.
   "success": true,
   "id": "ref_12345",
   "emailSent": true,
-  "message": "Reference saved and meeting invite sent"
+  "zoomMeetingId": "123456789",
+  "meetingLink": "https://zoom.us/j/...",
+  "message": "Reference saved and Zoom meeting invite sent successfully!"
 }
 ```
 
 **Features:**
-- Sends email invite with Google Meet link (if email + date provided)
-- Uses SMTP configuration for email delivery
-- Validates email format
-- Formats meeting dates properly
+- Real-time Zoom Meeting generation via S2S OAuth.
+- Automated email delivery via SMTP.
+- Optional Judge0 coding sandbox integration.
+- Persists data to `reference_calls` table.
+
+---
+
+#### **POST /api/zoom-webhook** - Zoom Event Listener
+Receives status updates from Zoom (started, ended) and calculates actual duration.
+
+**Request Body:** (Zoom Standard Webhook Schema)
+- `event`: `meeting.started` | `meeting.ended`
+- `payload`: { `object`: { `id`: "...", `duration`: ... } }
+
+**Response:**
+- **200 OK**: Event processed and `reference_calls` table updated.
+- **401 Unauthorized**: If `x-zm-signature` is invalid.
+
 
 ---
 
