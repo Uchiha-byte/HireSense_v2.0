@@ -42,14 +42,31 @@ export async function fetchLeetCodeProfile(username: string): Promise<LeetCodeDa
     }
 
     try {
-        console.log(`📡 Fetching LeetCode profile for: ${username}`);
+        console.log(`📡 Fetching LeetCode profile for: ${username} using ${baseUrl}`);
+
+        const fetchWithFallback = async (endpoint: string) => {
+            try {
+                const response = await fetch(`${baseUrl}/${username}${endpoint}`);
+                if (response.ok) return await response.json();
+                throw new Error(`API returned ${response.status}`);
+            } catch (err) {
+                // If the primary API fails and it was a custom URL, try the public fallback
+                const publicUrl = 'https://alfa-leetcode-api.onrender.com';
+                if (baseUrl !== publicUrl) {
+                    console.warn(`Primary LeetCode API failed, falling back to public API for ${endpoint}...`);
+                    const fallbackRes = await fetch(`${publicUrl}/${username}${endpoint}`);
+                    if (fallbackRes.ok) return await fallbackRes.json();
+                }
+                throw err;
+            }
+        };
 
         // Fetch multiple endpoints to construct a full profile
         const [profileRes, solvedRes, contestRes, submissionRes] = await Promise.all([
-            fetch(`${baseUrl}/${username}`).then(res => res.json()),
-            fetch(`${baseUrl}/${username}/solved`).then(res => res.json()),
-            fetch(`${baseUrl}/${username}/contest`).then(res => res.json()),
-            fetch(`${baseUrl}/${username}/submission`).then(res => res.json())
+            fetchWithFallback(""),
+            fetchWithFallback("/solved"),
+            fetchWithFallback("/contest"),
+            fetchWithFallback("/submission")
         ]);
 
         console.log(`📡 LeetCode Raw Profile Response for ${username}:`, JSON.stringify(profileRes).substring(0, 200));

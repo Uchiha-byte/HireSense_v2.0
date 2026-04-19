@@ -180,33 +180,47 @@ Return a JSON object with:
 }
 `;
 
-  try {
-    const completion = await groq.chat.completions.create({
-      model: "openai/gpt-oss-20b",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-    });
+  const maxRetries = 3;
+  let lastError: any;
 
-    const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
-    return {
-      summary: result.summary || `No summary could be generated for the ${sourceType.toUpperCase()}.`,
-      flags: result.flags || [],
-      score: result.score || 50,
-    };
-  } catch (error) {
-    console.error(`Analysis failed for source ${sourceType}:`, error);
-    return {
-      summary: `Analysis of the ${sourceType.toUpperCase()} failed due to a technical error.`,
-      flags: [{
-        type: 'yellow',
-        category: 'system',
-        message: `The ${sourceType.toUpperCase()} analysis could not be completed.`,
-        severity: 5
-      }],
-      score: 50,
-    };
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      return {
+        summary: result.summary || `No summary could be generated for the ${sourceType.toUpperCase()}.`,
+        flags: result.flags || [],
+        score: result.score || 50,
+      };
+    } catch (error: any) {
+      lastError = error;
+      if (error?.status === 429 && attempt < maxRetries) {
+        const delay = attempt * 2000;
+        console.warn(`Rate limit hit (429) analyzing ${sourceType}. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      break;
+    }
   }
+
+  console.error(`Analysis failed for source ${sourceType} after ${maxRetries} attempts:`, lastError);
+  return {
+    summary: `Analysis of the ${sourceType.toUpperCase()} failed due to a technical error.`,
+    flags: [{
+      type: 'yellow',
+      category: 'system',
+      message: `The ${sourceType.toUpperCase()} analysis could not be completed.`,
+      severity: 5
+    }],
+    score: 50,
+  };
 }
 
 
@@ -293,38 +307,52 @@ Return a JSON object with:
 Be objective. Do not make assumptions. Only work with the summaries provided.
 `;
 
-  try {
-    const completion = await groq.chat.completions.create({
-      model: "openai/gpt-oss-20b",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-    });
+  const maxRetries = 3;
+  let lastError: any;
 
-    const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      });
 
-    return {
-      score: result.score || 50,
-      summary: result.summary || 'Analysis completed with available data.',
-      flags: (result.flags || []).map((flag: Record<string, unknown>) => ({
-        type: flag.type === 'red' || flag.type === 'yellow' ? flag.type : 'yellow',
-        category: flag.category || 'verification',
-        message: flag.message || 'Analysis concern detected',
-        severity: typeof flag.severity === 'number' ? Math.max(1, Math.min(10, flag.severity)) : 5
-      })),
-      suggestedQuestions: result.suggestedQuestions || [],
-      analysisDate: new Date().toISOString(),
-      sources: (individualAnalyses as unknown as import('./interfaces/analysis').AnalysisSource[]),
-    };
-  } catch (error) {
-    console.error('Comprehensive analysis failed:', error);
-    return {
-      score: 50,
-      summary: 'Analysis could not be completed due to technical error.',
-      flags: [{ type: 'yellow', category: 'verification', message: 'Analysis system temporarily unavailable', severity: 5 }],
-      suggestedQuestions: ['Could you provide additional information about your background?'],
-      analysisDate: new Date().toISOString(),
-      sources: []
-    };
+      const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
+
+      return {
+        score: result.score || 50,
+        summary: result.summary || 'Analysis completed with available data.',
+        flags: (result.flags || []).map((flag: Record<string, unknown>) => ({
+          type: flag.type === 'red' || flag.type === 'yellow' ? flag.type : 'yellow',
+          category: flag.category || 'verification',
+          message: flag.message || 'Analysis concern detected',
+          severity: typeof flag.severity === 'number' ? Math.max(1, Math.min(10, flag.severity)) : 5
+        })),
+        suggestedQuestions: result.suggestedQuestions || [],
+        analysisDate: new Date().toISOString(),
+        sources: (individualAnalyses as unknown as import('./interfaces/analysis').AnalysisSource[]),
+      };
+    } catch (error: any) {
+      lastError = error;
+      if (error?.status === 429 && attempt < maxRetries) {
+        const delay = attempt * 3000;
+        console.warn(`Rate limit hit (429) in comprehensive analysis. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      break;
+    }
   }
+
+  console.error('Comprehensive analysis failed after retries:', lastError);
+  return {
+    score: 50,
+    summary: 'Analysis could not be completed due to technical error.',
+    flags: [{ type: 'yellow', category: 'verification', message: 'Analysis system temporarily unavailable', severity: 5 }],
+    suggestedQuestions: ['Could you provide additional information about your background?'],
+    analysisDate: new Date().toISOString(),
+    sources: []
+  };
 }

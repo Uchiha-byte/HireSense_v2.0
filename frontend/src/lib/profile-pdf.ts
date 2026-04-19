@@ -5,6 +5,8 @@ import * as path from "path";
 import { PDFDocument } from "pdf-lib";
 import { fromBuffer } from "pdf2pic";
 import sharp from "sharp";
+// pdf-parse will be imported dynamically to avoid runtime issues in Next.js
+
 
 // Initialize Groq client
 const groq = new Groq({
@@ -46,6 +48,10 @@ function getCvDataSchema() {
       github: {
         type: "string",
         description: "GitHub profile URL or username",
+      },
+      leetcode: {
+        type: "string",
+        description: "LeetCode profile URL or username",
       },
       personalWebsite: {
         type: "string",
@@ -442,14 +448,52 @@ function cleanAndFixJsonData(rawData: unknown): Partial<CvData> {
     ...(rawData as Record<string, unknown>),
   };
 
-  // Fix common field name issues
+  // Fix common field name issues for URLs and other fields
   if (cleaned.Hobbies) {
     cleaned.hobbies = cleaned.Hobbies;
     delete cleaned.Hobbies;
   }
+  
+  if (cleaned.LinkedIn && !cleaned.linkedin) {
+    cleaned.linkedin = cleaned.LinkedIn;
+    delete cleaned.LinkedIn;
+  }
+  
+  if (cleaned.GitHub && !cleaned.github) {
+    cleaned.github = cleaned.GitHub;
+    delete cleaned.GitHub;
+  }
+  
+  if (cleaned.LeetCode && !cleaned.leetcode) {
+    cleaned.leetcode = cleaned.LeetCode;
+    delete cleaned.LeetCode;
+  }
+
+  // Ensure URLs are properly formatted (add https:// if missing)
+  const urlFields = ["linkedin", "github", "leetcode", "personalWebsite"];
+  for (const field of urlFields) {
+    const val = cleaned[field];
+    if (typeof val === "string" && val.trim().length > 0) {
+      let url = val.trim();
+      
+      // Basic normalization for common handles
+      if (field === "linkedin" && !url.includes("linkedin.com")) {
+        url = `https://linkedin.com/in/${url.replace(/^@/, "")}`;
+      } else if (field === "github" && !url.includes("github.com")) {
+        url = `https://github.com/${url.replace(/^@/, "")}`;
+      } else if (field === "leetcode" && !url.includes("leetcode.com")) {
+        url = `https://leetcode.com/u/${url.replace(/^@/, "")}`;
+      }
+      
+      if (!url.startsWith("http") && url.length > 0) {
+        url = `https://${url}`;
+      }
+      cleaned[field] = url;
+    }
+  }
 
   // Fix number fields that might be strings or empty
-  const numberFields = [
+  const numberFieldsArr = [
     "startYear",
     "endYear",
     "startMonth",
@@ -461,7 +505,7 @@ function cleanAndFixJsonData(rawData: unknown): Partial<CvData> {
   function fixNumberFields(obj: Record<string, unknown>) {
     if (!obj || typeof obj !== "object") return;
 
-    for (const field of numberFields) {
+    for (const field of numberFieldsArr) {
       if (obj[field] !== undefined) {
         if (obj[field] === "" || obj[field] === null) {
           delete obj[field]; // Remove empty/null number fields
@@ -530,6 +574,7 @@ function cleanAndFixJsonData(rawData: unknown): Partial<CvData> {
     "phone",
     "linkedin",
     "github",
+    "leetcode",
     "personalWebsite",
     "professionalSummary",
     "jobTitle",
@@ -579,7 +624,7 @@ Guidelines:
 - Do not include any text outside the JSON object
 - Ensure all quotes and brackets are properly closed`;
 
-    const userPrompt = `Extract CV information from this image and return as JSON with this schema: ${JSON.stringify(
+    const userPrompt = `Extract CV information from the provided data (image or text) and return as JSON with this schema: ${JSON.stringify(
       schema,
       null,
       2
@@ -643,8 +688,6 @@ Guidelines:
 
     // Clean and fix the data
     const cleanedData = cleanAndFixJsonData(rawData);
-    // console.log(`Cleaned ${documentType.toUpperCase()} data:`, cleanedData);
-
     return cleanedData;
   } catch (error) {
     console.error(
@@ -658,6 +701,7 @@ Guidelines:
     return {
       lastName: "",
       firstName: "",
+      leetcode: "",
       professionalExperiences: [],
       educations: [],
       skills: [],
@@ -665,6 +709,84 @@ Guidelines:
       certifications: [],
       other: {},
     };
+  }
+}
+
+/**
+ * Extract data from raw text using Groq API
+ */
+export async function extractDataFromText(
+  text: string,
+  documentType: "cv" | "linkedin"
+): Promise<Partial<CvData>> {
+  try {
+    const schema = getCvDataSchema();
+
+    const systemPrompt = `
+    You are a highly accurate CV/Resume parser. Your goal is to extract all professional information into valid JSON.
+    
+    CRITICAL INSTRUCTION: You MUST find and extract the following URLs if they exist in the text:
+    1. LinkedIn Profile URL
+    2. GitHub Profile URL 
+    3. LeetCode Profile URL
+    4. Personal Portfolio/Website
+    
+    Look for patterns like 'linkedin.com/in/...', 'github.com/...', 'leetcode.com/u/...', etc. 
+    Even if the URL is not fully qualified (e.g. just a handle), try to construct the full URL.
+    
+    Return the result in valid JSON format only.`;
+
+    const userPrompt = `Extract CV information from this text and return as JSON with this schema: ${JSON.stringify(
+      schema,
+      null,
+      2
+    )}\n\nTEXT TO PARSE:\n${text}`;
+
+    const completion = await groq.chat.completions.create({
+      model: "meta-llama/llama-3.1-70b-versatile", // Use a large text model for text parsing
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+    });
+
+    const responseText = completion.choices[0]?.message?.content || "{}";
+    let rawData = JSON.parse(responseText);
+    return cleanAndFixJsonData(rawData);
+  } catch (error) {
+    console.error(`Error extracting ${documentType.toUpperCase()} data from text:`, error);
+    return {};
+  }
+}
+
+/**
+ * Extract text directly from a PDF file
+ */
+export async function extractTextFromPdf(pdfPath: string): Promise<string> {
+  try {
+    const dataBuffer = fs.readFileSync(pdfPath);
+    
+    // Polyfill 'self' which pdfjs-dist (via pdf-parse) expects in some environments
+    if (typeof (global as any).self === 'undefined') {
+      (global as any).self = global;
+    }
+
+    // Use require for pdf-parse to avoid ESM/CJS interop issues in Next.js
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdf = require("pdf-parse");
+    const data = await pdf(dataBuffer);
+    return data.text || "";
+  } catch (error) {
+    console.error("Error extracting text from PDF:", error);
+    return "";
   }
 }
 
@@ -784,6 +906,7 @@ function mergeCvData(dataArray: Partial<CvData>[]): CvData {
     phone: "",
     linkedin: "",
     github: "",
+    leetcode: "",
     personalWebsite: "",
     professionalSummary: "",
     jobTitle: "",
@@ -906,10 +1029,23 @@ export async function processPdf(
     );
     return documentData;
   } catch (error) {
-    console.error(`Error processing ${documentType.toUpperCase()} PDF:`, error);
-    throw new Error(
-      `Failed to process ${documentType.toUpperCase()} PDF: ${error}`
-    );
+    console.warn(`Image-based processing failed for ${documentType.toUpperCase()}, falling back to direct text extraction...`);
+    
+    try {
+      const text = await extractTextFromPdf(pdfPath);
+      if (text && text.trim().length > 10) {
+        console.log(`Successfully extracted ${text.length} characters from PDF text layer.`);
+        const documentData = await extractDataFromText(text, documentType);
+        return validateAndCleanCvData(documentData);
+      } else {
+        throw new Error("Extracted text is too short or empty.");
+      }
+    } catch (fallbackError) {
+      console.error(`Fallback text extraction also failed:`, fallbackError);
+      throw new Error(
+        `Failed to process ${documentType.toUpperCase()} PDF (both image and text strategies failed): ${error}`
+      );
+    }
   } finally {
     // Always attempt cleanup if enabled and we have image paths
     if (cleanupImages && imagePaths.length > 0) {
@@ -976,6 +1112,7 @@ export function validateAndCleanCvData(cvData: Partial<CvData>): CvData {
     phone: cvData.phone || "",
     linkedin: cvData.linkedin || "",
     github: cvData.github || "",
+    leetcode: cvData.leetcode || "",
     personalWebsite: cvData.personalWebsite || "",
     professionalSummary: cvData.professionalSummary || "",
     jobTitle: cvData.jobTitle || "",
