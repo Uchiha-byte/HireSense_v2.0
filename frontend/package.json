@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -64,6 +64,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@types/deep-eql": "^4.0.2",
     "@types/node": "^20.19.8",
     "@types/nodemailer": "^7.0.2",
     "@types/react": "^19",
