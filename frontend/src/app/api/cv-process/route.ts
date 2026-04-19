@@ -88,10 +88,17 @@ export async function POST(request: Request) {
           const name = `${cvData.firstName} ${cvData.lastName}`.trim() || applicant.name;
           const email = cvData.email || applicant.email;
 
-          // Update name and email in addition to cv_data
+          // Update name, email and social links in addition to cv_data
           await supabase
             .from('applicants')
-            .update({ name, email })
+            .update({ 
+              name, 
+              email,
+              linkedin_url: cvData.linkedin || applicant.linkedin_url,
+              github_url: cvData.github || applicant.github_url,
+              leetcode_url: cvData.leetcode || applicant.leetcode_url,
+              cv_data: cvData // Also save the full JSON data
+            })
             .eq('id', applicant_id);
         }
 
