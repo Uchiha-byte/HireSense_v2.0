@@ -10,6 +10,7 @@ export interface CvData {
   phone: string
   linkedin: string
   github: string
+  leetcode: string
   personalWebsite: string
   professionalSummary: string
   jobTitle: string

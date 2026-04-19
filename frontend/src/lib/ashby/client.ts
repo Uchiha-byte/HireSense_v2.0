@@ -162,7 +162,7 @@ export class AshbyClient {
     const formData = new FormData();
     formData.append('candidateId', params.candidateId);
     
-    const blob = new Blob([params.file], { type: params.contentType || 'application/pdf' });
+    const blob = new Blob([params.file as any], { type: params.contentType || 'application/pdf' });
     formData.append('file', blob, params.filename);
 
     return this.request<AshbyResumeUploadResponse>('/candidate.uploadResume', 'POST', formData);

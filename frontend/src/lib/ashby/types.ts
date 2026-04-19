@@ -130,7 +130,7 @@ export interface AshbyApplication {
 // Resume/File Types
 export interface AshbyResumeUploadRequest {
   candidateId: string;
-  file: Buffer | ArrayBuffer;
+  file: Uint8Array | ArrayBuffer;
   filename: string;
   contentType?: string;
 }
