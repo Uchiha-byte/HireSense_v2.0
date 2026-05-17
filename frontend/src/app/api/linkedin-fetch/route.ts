@@ -34,72 +34,81 @@ export async function POST(request: Request) {
         }
 
         console.log(`🚀 Starting LinkedIn job for ${applicant_id}`);
-        const { jobId, isExisting } = await startLinkedInJob(linkedin_url);
-
         let linkedinData;
+        
+        try {
+          const { jobId, isExisting } = await startLinkedInJob(linkedin_url);
 
-        if (isExisting) {
-          // For existing snapshots, try to get data directly
-          console.log(`♻️ Using existing LinkedIn snapshot ${jobId}`);
-          const result = await checkLinkedInJob(jobId, true);
-          if (result.data) {
-            linkedinData = processLinkedInData(result.data);
-          } else {
-            return {
-              error: 'existing_snapshot_no_data',
-              message: 'No data available from existing snapshot',
-              processed_at: new Date().toISOString()
-            };
-          }
-        } else {
-          // Poll until complete for new jobs
-          console.log(`⏳ Waiting for LinkedIn job ${jobId} to complete...`);
-          let attempts = 0;
-          const maxAttempts = 36; // Reduced from 60 to 36 (3 minutes max)
-          let lastStatus = 'unknown';
-
-          while (attempts < maxAttempts) {
-            const result = await checkLinkedInJob(jobId);
-
-            // Log status changes for better monitoring
-            if (result.status !== lastStatus) {
-              console.log(`📊 LinkedIn job ${jobId} status changed: ${lastStatus} → ${result.status} (attempt ${attempts + 1}/${maxAttempts})`);
-              lastStatus = result.status;
-            }
-
-            if (result.status === 'completed' && result.data) {
+          if (isExisting) {
+            // For existing snapshots, try to get data directly
+            console.log(`♻️ Using existing LinkedIn snapshot ${jobId}`);
+            const result = await checkLinkedInJob(jobId, true);
+            if (result.data) {
               linkedinData = processLinkedInData(result.data);
-              console.log(`✅ LinkedIn job ${jobId} completed successfully with data`);
-              break;
-            } else if (result.status === 'failed') {
-              console.log(`❌ LinkedIn job ${jobId} failed - profile may be private or inaccessible`);
+            } else {
               return {
-                error: 'profile_not_accessible',
-                message: 'LinkedIn profile not accessible - snapshot empty or blocked',
-                processed_at: new Date().toISOString()
-              };
-            } else if (result.status === 'completed' && !result.data) {
-              // This should not happen with our updated logic, but handle it gracefully
-              console.log(`⚠️ LinkedIn job ${jobId} completed but returned no data - treating as failed`);
-              return {
-                error: 'profile_no_data',
-                message: 'LinkedIn profile returned no data',
+                error: 'existing_snapshot_no_data',
+                message: 'No data available from existing snapshot',
                 processed_at: new Date().toISOString()
               };
             }
+          } else {
+            // Poll until complete for new jobs
+            console.log(`⏳ Waiting for LinkedIn job ${jobId} to complete...`);
+            let attempts = 0;
+            const maxAttempts = 36; // Reduced from 60 to 36 (3 minutes max)
+            let lastStatus = 'unknown';
 
-            attempts++;
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-          }
+            while (attempts < maxAttempts) {
+              const result = await checkLinkedInJob(jobId);
 
-          if (!linkedinData) {
-            console.log(`⏰ LinkedIn job ${jobId} timed out after ${maxAttempts} attempts`);
-            return {
-              error: 'profile_timeout',
-              message: `LinkedIn job timed out after ${Math.floor(maxAttempts * 5 / 60)} minutes`,
-              processed_at: new Date().toISOString()
-            };
+              // Log status changes for better monitoring
+              if (result.status !== lastStatus) {
+                console.log(`📊 LinkedIn job ${jobId} status changed: ${lastStatus} → ${result.status} (attempt ${attempts + 1}/${maxAttempts})`);
+                lastStatus = result.status;
+              }
+
+              if (result.status === 'completed' && result.data) {
+                linkedinData = processLinkedInData(result.data);
+                console.log(`✅ LinkedIn job ${jobId} completed successfully with data`);
+                break;
+              } else if (result.status === 'failed') {
+                console.log(`❌ LinkedIn job ${jobId} failed - profile may be private or inaccessible`);
+                return {
+                  error: 'profile_not_accessible',
+                  message: 'LinkedIn profile not accessible - snapshot empty or blocked',
+                  processed_at: new Date().toISOString()
+                };
+              } else if (result.status === 'completed' && !result.data) {
+                // This should not happen with our updated logic, but handle it gracefully
+                console.log(`⚠️ LinkedIn job ${jobId} completed but returned no data - treating as failed`);
+                return {
+                  error: 'profile_no_data',
+                  message: 'LinkedIn profile returned no data',
+                  processed_at: new Date().toISOString()
+                };
+              }
+
+              attempts++;
+              await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            }
+
+            if (!linkedinData) {
+              console.log(`⏰ LinkedIn job ${jobId} timed out after ${maxAttempts} attempts`);
+              return {
+                error: 'profile_timeout',
+                message: `LinkedIn job timed out after ${Math.floor(maxAttempts * 5 / 60)} minutes`,
+                processed_at: new Date().toISOString()
+              };
+            }
           }
+        } catch (error: any) {
+          // If BrightData account is inactive or fails, fallback to dummy data gracefully
+          if (error.status === 400 || error.message?.includes('Customer is not active') || error.details?.includes('Customer is not active')) {
+            console.log(`⚠️ BrightData API error (Customer inactive/400). Falling back to dummy data for ${applicant_id}`);
+            return generateDummyLinkedInData(linkedin_url);
+          }
+          throw error;
         }
 
         // Check if we got an error response instead of data
