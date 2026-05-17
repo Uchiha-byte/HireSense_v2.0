@@ -252,6 +252,7 @@ export function convertLinkedInApiToProfileData(linkedinApiData: LinkedInApiResp
     phone: '',
     linkedin: data.url || data.input_url || '',
     github: '',
+    leetcode: '',
     personalWebsite: '',
     professionalSummary: data.about || '',
     jobTitle: data.position || data.current_company?.title || '',
@@ -670,9 +671,12 @@ export async function findExistingLinkedInSnapshot(linkedinUrl: string): Promise
     const targetUrl = normalizeUrl(linkedinUrl);
 
     // Since the snapshots list doesn't include URLs, we need to check each snapshot individually
-    const matchingSnapshots = [];
+    const matchingSnapshots: any[] = [];
 
-    for (const snapshot of snapshots) {
+    // Limit to the 10 most recent snapshots to avoid taking too much time (which causes 30s delays)
+    const snapshotsToCheck = snapshots.slice(0, 10);
+
+    await Promise.all(snapshotsToCheck.map(async (snapshot: any) => {
       try {
         // Fetch individual snapshot details to get the input URL
         const detailResponse = await fetch(`https://api.brightdata.com/datasets/v3/snapshot/${snapshot.id}`, {
@@ -684,21 +688,21 @@ export async function findExistingLinkedInSnapshot(linkedinUrl: string): Promise
 
         if (!detailResponse.ok) {
           console.log(`⚠️ Failed to fetch details for snapshot ${snapshot.id}`);
-          continue;
+          return;
         }
 
         const responseText = await detailResponse.text();
         if (!responseText) {
           console.log(`⚠️ Empty response for snapshot ${snapshot.id}`);
-          continue;
+          return;
         }
 
         let snapshotDetails;
         try {
           snapshotDetails = JSON.parse(responseText);
         } catch {
-          console.log(`⚠️ Invalid JSON response for snapshot ${snapshot.id}:`, responseText);
-          continue;
+          console.log(`⚠️ Invalid JSON response for snapshot ${snapshot.id}`);
+          return;
         }
         const snapshotUrl = snapshotDetails.input?.[0]?.url || '';
 
@@ -711,9 +715,8 @@ export async function findExistingLinkedInSnapshot(linkedinUrl: string): Promise
         }
       } catch (error) {
         console.log(`⚠️ Error checking snapshot ${snapshot.id}:`, error);
-        continue;
       }
-    }
+    }));
 
     if (matchingSnapshots.length === 0) {
       console.log(`❌ No existing snapshots found for ${linkedinUrl}`);
